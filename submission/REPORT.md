@@ -39,6 +39,11 @@ Lấy từ `02_error_list_v1` (có 149/224 ảnh có ít nhất một lỗi ho�
 2. **Box lỏng nhẹ.** `POSSIBLE_LOOSE_BOX` chỉ đạt precision / recall 0,20 / 0,20 ở `conf` = 0.6 và vẫn tệ ở mọi mức khác (cao nhất 0,38 / 0,60 ở 0.1). Box lệch ít (IoU ≥ 0,5 so với model) không bị cờ, và hàng đợi chỉ phủ 8/24 ảnh `LOOSE_BOX`.
 3. **Cảnh báo giả nhiều.** `POSSIBLE_FALSE_POS` chỉ có precision 0,31 trên calib (5 lỗi thật, 11 cờ sai) vì nhãn người khác model ở những vật khó. Cờ này tốn lượt duyệt nhưng ít giá trị.
 
+(c) 3 lỗi tự nhìn thấy bằng mắt từ 10 ảnh trong `work/viz/` (theo Bước 1):
+1. **Ảnh `img_0004` (Thiếu toàn bộ nhãn - EMPTY_LABEL / POSSIBLE_MISSING):** File nhãn hoàn toàn rỗng nhưng khi mở ảnh trực quan thấy rõ ràng có các xe ô tô (`car`) đang đỗ trên đường mà không hề có bất kỳ bounding box nào được vẽ.
+2. **Ảnh `img_0001` (Trùng lặp box - DUP_BOX):** Nhìn trên ảnh thấy 2 bounding box màu xanh dương đè khít lên cùng một chiếc xe ở dòng 2 và 3 (IoU = 0.99), đồng thời người đi bộ (`person`) ở góc ảnh bị bỏ sót nhãn hoàn toàn.
+3. **Ảnh `img_0030` (Box tràn mép ảnh - BOX_OUT_OF_IMAGE & Vẽ sai đối tượng - FALSE_POS):** Box ở dòng 9 bị vẽ lệch tràn hẳn ra ngoài mép ảnh (mức tràn 0.023) và bao quanh vùng nền trống không có đối tượng hợp lệ.
+
 ## 5. Train: raw vs clean (tùy chọn, chấm riêng)
 Train trên Colab (GPU), `yolo26n.pt`, 20 epoch, batch 16, imgsz 640, 2 seed (0, 1), cùng val (`gold_val`) và cùng test (100 ảnh). Bảng do `scripts/summarize_results.py` sinh (`submission/results/comparison.md`):
 
