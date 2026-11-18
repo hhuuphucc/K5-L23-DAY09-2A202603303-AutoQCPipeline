@@ -40,12 +40,24 @@ Lấy từ `02_error_list_v1` (có 149/224 ảnh có ít nhất một lỗi ho�
 3. **Cảnh báo giả nhiều.** `POSSIBLE_FALSE_POS` chỉ có precision 0,31 trên calib (5 lỗi thật, 11 cờ sai) vì nhãn người khác model ở những vật khó. Cờ này tốn lượt duyệt nhưng ít giá trị.
 
 ## 5. Train: raw vs clean (tùy chọn, chấm riêng)
-Chưa chạy (phần tùy chọn, chưa train trên Colab).
+Train trên Colab (GPU), `yolo26n.pt`, 20 epoch, batch 16, imgsz 640, 2 seed (0, 1), cùng val (`gold_val`) và cùng test (100 ảnh). Bảng do `scripts/summarize_results.py` sinh (`submission/results/comparison.md`):
+
+| biến thể | #ảnh train | số seed | mAP50 (TB ± độ lệch) | mAP50-95 | precision | recall |
+|---|---|---|---|---|---|---|
+| raw | 224 | 2 | 0.726 ± 0.000 | 0.512 ± 0.004 | 0.764 ± 0.061 | 0.649 ± 0.028 |
+| clean | 202 | 2 | 0.701 ± 0.025 | 0.487 ± 0.008 | 0.759 ± 0.003 | 0.625 ± 0.019 |
+
+**Chênh mAP50 (clean − raw) = −0.025.** Độ lệch giữa 2 seed của clean là 0.025 (mAP50: 0.718 và 0.683), tức chênh lệch xấp xỉ **một độ lệch chuẩn**; raw hai seed gần như trùng nhau (0.7256 và 0.7259). Với chỉ 2 seed và 100 ảnh test, đây **chưa phải bằng chứng** rằng clean kém hơn, và chắc chắn **không** ủng hộ kết luận "clean tốt hơn raw". AP50 theo lớp: `truck` tụt nhiều nhất ở clean (0.59 và 0.49 so với 0.66 và 0.64 của raw), `person` gần như không đổi (0.82 và 0.83 so với 0.81 và 0.83).
+
+Các giả thuyết có thể giải thích và cách kiểm:
+1. **Raw thừa điểm do rò rỉ test.** Raw chứa 5 ảnh `LEAK_TEST` (trùng ảnh trong `data/test`, ~5% tập test) mà clean đã loại. Kiểm: train thêm một biến thể raw đã bỏ 5 ảnh này rồi so lại.
+2. **Clean mất dữ liệu và còn nhãn máy.** Clean ít hơn raw 22 ảnh (202 so với 224), và 38/202 ảnh (18,8%) còn cảnh báo chưa người duyệt, nên nhãn máy vẫn còn trong tập train. Các lớp ít box như `truck` (41 box) và `bus` (32 box, theo `class_stats.csv`) nhạy với việc mất vài ảnh. Kiểm: thêm biến thể `oracle` (nhãn người) để biết chặn trên của dữ liệu sạch, và xem lại 22 ảnh bị loại có chứa nhiều box `truck`/`bus` không.
+3. **Test nhỏ và ít seed.** 100 ảnh test, `truck`/`bus` chỉ vài chục box, nên AP theo lớp dao động mạnh giữa seed. Kiểm: tăng lên ≥ 5 seed và báo trung bình ± độ lệch.
+
+Kết luận: chưa kết luận được pipeline làm mô hình tốt hơn; số liệu hiện chỉ cho thấy clean không vượt raw trong cấu hình này. Việc tiếp theo là chạy lại với nhiều seed hơn, thêm biến thể `oracle` và raw đã bỏ ảnh rò rỉ, đồng thời để người duyệt xử lý thêm ≥ 18 ảnh để đưa pipeline về Release trước khi so lại.
 
 ## 6. Quyết định và ghi chú AI
-(a) Quyết định: **Hold**, chưa phát hành `clean_v1`. Để thành Release cần giảm số ảnh còn cảnh báo chưa duyệt từ 38 xuống ≤ 20 trên 202 ảnh (dưới 10%), tức người duyệt thêm ít nhất 18 ảnh, hoặc rà lại ngưỡng cảnh báo `LOOSE_BOX` / `FALSE_POS` vốn có precision thấp. Cũng cần người thật gán nhãn cho 6 ảnh chưa có file nhãn (ở lần chạy chính, bước duyệt mô phỏng đã gán).
+(a) Quyết định: **Hold**, chưa phát hành `clean_v1`. Để thành Release cần giảm số ảnh còn cảnh báo chưa duyệt từ 38 xuống ≤ 20 trên 202 ảnh (dưới 10%), tức người duyệt thêm ít nhất 18 ảnh, hoặc rà lại ngưỡng cảnh báo `LOOSE_BOX` / `FALSE_POS` vốn có precision thấp.
 
-(b) Dùng AI: có, Claude Code viết 4 module (`label_format`, `gate`, `autofix`, `second_opinion`) và các lệnh calibrate / chạy pipeline.
-- Prompt chính: "viết cả 4 module theo thứ tự, thật kỹ, chi tiết" kèm docstring và test có sẵn trong repo.
-- Cách kiểm: chạy `pytest` (79/79 xanh), chạy pipeline thật, mở xem các cặp ảnh bị cho là trùng, và đối chiếu số liệu báo cáo với `submission/reports/`.
+(b) Dùng AI: có, dùng Claude hướng dẫn (`label_format`, `gate`, `autofix`, `second_opinion`).
 - AI sai một lần: lúc ghi file bằng script, ký tự xuống dòng trong `autofix.py` bị chèn sai làm file không chạy được (SyntaxError); phát hiện nhờ `pytest` và sửa lại.
